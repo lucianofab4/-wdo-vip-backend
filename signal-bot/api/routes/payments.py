@@ -21,6 +21,10 @@ BOT_USERNAME  = os.getenv("TELEGRAM_BOT_USERNAME", "Quantico20k_bot").strip().ls
 ADMIN_IDS     = [int(x) for x in os.getenv("TELEGRAM_ADMIN_IDS", "").split(",") if x.strip()]
 API_BASE_URL  = os.getenv("RAILWAY_API_URL", "http://localhost:8000")
 
+# Canal VIP — bot Wdotrader_bot precisa ser admin com permissao de convidar
+VIP_BOT_TOKEN  = os.getenv("VIP_BOT_TOKEN",  "8992965841:AAGOg60JQ5ysTi9nyNcnm-B8COFuuhlJScM")
+VIP_CHANNEL_ID = os.getenv("VIP_CHANNEL_ID", "-1004459210142")
+
 PLANS = {
     "6months":        {"label": "6 Meses",          "amount": 80.00},
     "lifetime":       {"label": "Vitalicio",         "amount": 99.00},
@@ -55,6 +59,37 @@ async def _notify_telegram(chat_id: int, text: str):
             await client.post(url, json={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"})
         except Exception:
             pass
+
+
+async def _gerar_link_canal(expire_horas: int = 48) -> str:
+    """Gera link de convite único (1 uso) para o canal VIP."""
+    import time as _t
+    expire_ts = int(_t.time()) + expire_horas * 3600
+    url = f"https://api.telegram.org/bot{VIP_BOT_TOKEN}/createChatInviteLink"
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post(url, json={
+            "chat_id":      VIP_CHANNEL_ID,
+            "member_limit": 1,
+            "expire_date":  expire_ts,
+        })
+        data = r.json()
+    if data.get("ok"):
+        return data["result"]["invite_link"]
+    logger.error(f"[Canal] Falha ao gerar invite link: {data}")
+    return ""
+
+
+async def _remover_do_canal(telegram_id: int):
+    """Remove (bane + desbane) um usuário do canal VIP."""
+    async with httpx.AsyncClient(timeout=10) as client:
+        await client.post(
+            f"https://api.telegram.org/bot{VIP_BOT_TOKEN}/banChatMember",
+            json={"chat_id": VIP_CHANNEL_ID, "user_id": telegram_id, "revoke_messages": False},
+        )
+        await client.post(
+            f"https://api.telegram.org/bot{VIP_BOT_TOKEN}/unbanChatMember",
+            json={"chat_id": VIP_CHANNEL_ID, "user_id": telegram_id},
+        )
 
 
 @router.post("/create", response_model=CreatePaymentResponse)
@@ -175,20 +210,56 @@ async def mercadopago_webhook(request: Request, db: AsyncSession = Depends(get_d
         )
         req = result2.scalar_one_or_none()
 
-    if req:
-        req.payment_status = "paid"
-        req.status = "pending"
-        req.payment_id = payment_id
-        await db.commit()
+    # Gera link do canal automaticamente
+    invite_link = await _gerar_link_canal(expire_horas=48)
 
-    # Notifica admins no Telegram
+    # Calcula vencimento do plano
+    from datetime import timedelta
+    plan_days = {"dolar_mensal": 30, "dolar_semestral": 180, "6months": 180, "lifetime": None, "dolar_teste": 1}
+    days = plan_days.get(plan_key)
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(days=days) if days else None
+
+    # Atualiza AccessRequest
+    if req:
+        req.payment_status      = "paid"
+        req.status              = "approved"
+        req.payment_id          = payment_id
+        req.channel_invite_link = invite_link
+        req.resolved_at         = now
+    await db.commit()
+
+    # Cria ou atualiza TelegramUser
+    user_result = await db.execute(
+        select(TelegramUser).where(TelegramUser.username == username)
+    )
+    user = user_result.scalar_one_or_none()
+    if user:
+        user.is_active  = True
+        user.plan       = plan_key
+        user.expires_at = expires_at
+    else:
+        import random as _rnd
+        user = TelegramUser(
+            telegram_id = -_rnd.randint(10**9, 10**12),
+            username    = username,
+            first_name  = payment.get("payer", {}).get("first_name", username),
+            is_active   = True,
+            plan        = plan_key,
+            expires_at  = expires_at,
+        )
+        db.add(user)
+    await db.commit()
+
+    # Notifica admins
     msg_admin = (
-        f"*Novo pagamento recebido!*\n\n"
+        f"✅ *Pagamento aprovado automaticamente!*\n\n"
         f"Nome: {payment.get('payer', {}).get('first_name', '?')}\n"
         f"Telegram: @{username}\n"
         f"Plano: {plan.get('label', plan_key)}\n"
-        f"Valor: R$ {payment.get('transaction_amount', 0):.2f}\n\n"
-        f"Acesse o painel para aprovar o acesso."
+        f"Valor: R$ {payment.get('transaction_amount', 0):.2f}\n"
+        f"Vence: {expires_at.strftime('%d/%m/%Y') if expires_at else 'Vitalício'}\n\n"
+        f"Link enviado para o cliente via página de pagamento."
     )
     for admin_id in ADMIN_IDS:
         await _notify_telegram(admin_id, msg_admin)
@@ -205,4 +276,58 @@ async def payment_status(payment_id: str, db: AsyncSession = Depends(get_db)):
     req = result.scalar_one_or_none()
     if not req:
         return {"status": "not_found"}
-    return {"status": req.payment_status, "request_status": req.status}
+    return {
+        "status":       req.payment_status,
+        "request_status": req.status,
+        "invite_link":  req.channel_invite_link or "",
+    }
+
+
+@router.get("/expiring")
+async def expiring_soon(days: int = 5, db: AsyncSession = Depends(get_db)):
+    """Lista assinantes que vencem nos proximos N dias."""
+    from datetime import timedelta
+    now  = datetime.now(timezone.utc)
+    lim  = now + timedelta(days=days)
+    result = await db.execute(
+        select(TelegramUser).where(
+            TelegramUser.is_active == True,
+            TelegramUser.expires_at != None,
+            TelegramUser.expires_at >= now,
+            TelegramUser.expires_at <= lim,
+        ).order_by(TelegramUser.expires_at)
+    )
+    users = result.scalars().all()
+    return [
+        {
+            "telegram_id": u.telegram_id,
+            "username":    u.username,
+            "first_name":  u.first_name,
+            "plan":        u.plan,
+            "expires_at":  u.expires_at.strftime("%d/%m/%Y %H:%M") if u.expires_at else None,
+        }
+        for u in users
+    ]
+
+
+@router.post("/process-expired")
+async def process_expired(db: AsyncSession = Depends(get_db)):
+    """Remove do canal e desativa usuários com plano vencido."""
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(TelegramUser).where(
+            TelegramUser.is_active == True,
+            TelegramUser.expires_at != None,
+            TelegramUser.expires_at < now,
+        )
+    )
+    expired = result.scalars().all()
+    removidos = []
+    for u in expired:
+        if u.telegram_id and u.telegram_id > 0:
+            await _remover_do_canal(u.telegram_id)
+        u.is_active = False
+        removidos.append(u.username or str(u.telegram_id))
+    if expired:
+        await db.commit()
+    return {"removidos": removidos, "total": len(removidos)}
