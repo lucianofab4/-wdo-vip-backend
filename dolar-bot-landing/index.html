@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dólar Signal Bot — 12 Pontos Por Dia No Dólar</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: { 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+    * { font-family: 'Inter', sans-serif; }
+
+    .gradient-gold  { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+    .gradient-blue  { background: linear-gradient(135deg, #1e40af, #3b82f6); }
+    .gradient-green { background: linear-gradient(135deg, #059669, #10b981); }
+    .gradient-dark  { background: linear-gradient(135deg, #0f172a, #1e293b); }
+
+    .glow-gold  { box-shadow: 0 0 30px rgba(251,191,36,0.25); }
+    .glow-green { box-shadow: 0 0 30px rgba(16,185,129,0.25); }
+    .glow-blue  { box-shadow: 0 0 30px rgba(59,130,246,0.20); }
+
+    .ticker {
+      animation: ticker 20s linear infinite;
+    }
+    @keyframes ticker {
+      0%   { transform: translateX(100%); }
+      100% { transform: translateX(-100%); }
+    }
+
+    .pulse-dot {
+      animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    .plan-card { transition: all .2s ease; }
+    .plan-card.selected { transform: scale(1.02); }
+
+    .number-counter {
+      font-variant-numeric: tabular-nums;
+    }
+
+    details summary::-webkit-details-marker { display: none; }
+  </style>
+</head>
+<body class="bg-gray-950 text-white">
+
+  <!-- TICKER -->
+  <div class="bg-gray-900 border-b border-gray-800 py-2 overflow-hidden">
+    <div class="ticker whitespace-nowrap text-sm font-semibold">
+      <span class="text-green-400 mr-8">▲ DÓLAR MINI (WDO)  +6.2 pts</span>
+      <span class="text-gray-500 mr-8">|</span>
+      <span class="text-yellow-400 mr-8">⚡ SINAL ATIVO AGORA</span>
+      <span class="text-gray-500 mr-8">|</span>
+      <span class="text-green-400 mr-8">▲ RESULTADO DO DIA  +12 pts  ✅</span>
+      <span class="text-gray-500 mr-8">|</span>
+      <span class="text-blue-400 mr-8">💰 5 contratos = R$ 600 hoje</span>
+      <span class="text-gray-500 mr-8">|</span>
+      <span class="text-green-400 mr-8">▲ DÓLAR MINI (WDO)  +6.2 pts</span>
+      <span class="text-gray-500 mr-8">|</span>
+      <span class="text-yellow-400 mr-8">⚡ SINAL ATIVO AGORA</span>
+    </div>
+  </div>
+
+  <!-- HERO -->
+  <section class="py-20 px-4 text-center relative overflow-hidden" style="background: linear-gradient(135deg,#060d1f,#0d1f3c,#060d1f);">
+
+    <!-- Canvas: gráfico de velas animado -->
+    <canvas id="candleCanvas" class="absolute inset-0 w-full h-full" style="opacity:0.18;"></canvas>
+
+    <!-- Touro (esquerda) -->
+    <div class="absolute left-0 bottom-0 opacity-10 pointer-events-none select-none hidden md:block" style="width:320px;">
+      <svg viewBox="0 0 200 180" xmlns="http://www.w3.org/2000/svg" fill="#22c55e">
+        <!-- corpo -->
+        <ellipse cx="110" cy="120" rx="60" ry="40"/>
+        <!-- cabeça -->
+        <ellipse cx="60" cy="95" rx="30" ry="28"/>
+        <!-- focinho -->
+        <ellipse cx="38" cy="108" rx="14" ry="10"/>
+        <!-- chifres -->
+        <path d="M48 72 Q30 40 10 50 Q25 60 40 78" stroke="#22c55e" stroke-width="6" fill="none" stroke-linecap="round"/>
+        <path d="M68 70 Q65 38 80 30 Q78 55 72 72" stroke="#22c55e" stroke-width="6" fill="none" stroke-linecap="round"/>
+        <!-- pernas -->
+        <rect x="80" y="150" width="16" height="30" rx="6"/>
+        <rect x="105" y="155" width="16" height="28" rx="6"/>
+        <rect x="130" y="150" width="16" height="30" rx="6"/>
+        <rect x="155" y="152" width="16" height="28" rx="6"/>
+        <!-- cauda -->
+        <path d="M168 110 Q190 90 185 70" stroke="#22c55e" stroke-width="5" fill="none" stroke-linecap="round"/>
+        <!-- olho -->
+        <circle cx="48" cy="90" r="5" fill="#060d1f"/>
+        <circle cx="49" cy="89" r="2" fill="#22c55e"/>
+        <!-- narina -->
+        <circle cx="32" cy="108" r="3" fill="#060d1f"/>
+        <circle cx="43" cy="110" r="3" fill="#060d1f"/>
+      </svg>
+    </div>
+
+    <!-- Urso (direita) -->
+    <div class="absolute right-0 bottom-0 opacity-10 pointer-events-none select-none hidden md:block" style="width:300px; transform: scaleX(-1);">
+      <svg viewBox="0 0 200 190" xmlns="http://www.w3.org/2000/svg" fill="#ef4444">
+        <!-- corpo -->
+        <ellipse cx="100" cy="130" rx="65" ry="45"/>
+        <!-- cabeça -->
+        <circle cx="60" cy="90" r="38"/>
+        <!-- orelhas -->
+        <circle cx="35" cy="58" r="16"/>
+        <circle cx="85" cy="52" r="16"/>
+        <!-- focinho -->
+        <ellipse cx="55" cy="108" rx="20" ry="14"/>
+        <!-- pernas -->
+        <rect x="55" y="162" width="20" height="28" rx="8"/>
+        <rect x="88" y="165" width="20" height="26" rx="8"/>
+        <rect x="118" y="162" width="20" height="28" rx="8"/>
+        <rect x="148" y="163" width="20" height="27" rx="8"/>
+        <!-- braços -->
+        <ellipse cx="30" cy="140" rx="14" ry="30" transform="rotate(-20 30 140)"/>
+        <ellipse cx="160" cy="135" rx="14" ry="30" transform="rotate(20 160 135)"/>
+        <!-- cauda -->
+        <circle cx="163" cy="118" r="9"/>
+        <!-- olho -->
+        <circle cx="46" cy="83" r="7" fill="#060d1f"/>
+        <circle cx="47" cy="82" r="3" fill="#ef4444"/>
+        <!-- nariz -->
+        <ellipse cx="52" cy="100" r="9" fill="#b91c1c"/>
+        <!-- boca -->
+        <path d="M44 110 Q55 120 66 110" stroke="#b91c1c" stroke-width="3" fill="none" stroke-linecap="round"/>
+      </svg>
+    </div>
+
+    <!-- Overlay escuro central para legibilidade -->
+    <div class="absolute inset-0 pointer-events-none" style="background: radial-gradient(ellipse 60% 80% at 50% 50%, transparent 30%, rgba(6,13,31,0.7) 100%);"></div>
+
+    <div class="max-w-4xl mx-auto relative" style="z-index:2;">
+      <div class="inline-flex items-center gap-2 bg-green-500/10 border border-green-500/30 px-4 py-2 rounded-full text-sm font-semibold text-green-400 mb-6">
+        <span class="w-2 h-2 bg-green-400 rounded-full pulse-dot"></span>
+        BOT OPERANDO AO VIVO AGORA
+      </div>
+
+      <h1 class="text-4xl md:text-6xl font-black leading-tight mb-4">
+        <span class="text-white">O Robô que Busca</span><br/>
+        <span class="text-transparent bg-clip-text gradient-gold" style="background: linear-gradient(135deg,#fbbf24,#f97316); -webkit-background-clip:text;">12 PONTOS POR DIA</span><br/>
+        <span class="text-white">No Dólar Futuro</span>
+      </h1>
+
+      <p class="text-xl text-gray-300 mb-4 max-w-2xl mx-auto">
+        2 entradas por dia. 6 pontos cada. Automático. No seu Telegram.
+      </p>
+      <p class="text-2xl font-black text-yellow-400 mb-10">
+        5 contratos × 12 pontos = <span class="text-green-400">R$ 600 por dia</span>
+      </p>
+
+      <a href="#planos" class="inline-block gradient-gold text-black font-black text-xl px-12 py-5 rounded-2xl glow-gold hover:scale-105 transition-transform">
+        QUERO GANHAR R$ 600/DIA →
+      </a>
+
+      <p class="text-gray-500 text-sm mt-5">Ativação em minutos via PIX • Sem mensalidade oculta</p>
+    </div>
+  </section>
+
+  <!-- COMPARATIVO IMPACTO -->
+  <section class="bg-gray-900 py-16 px-4">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl font-black text-center mb-3">Por que o <span class="text-yellow-400">Dólar</span> é diferente?</h2>
+      <p class="text-gray-400 text-center mb-12">6 pontos no Dólar vale o mesmo que <strong class="text-white">300 pontos no Índice</strong></p>
+
+      <div class="grid md:grid-cols-2 gap-6">
+        <!-- Índice -->
+        <div class="bg-gray-950 border border-gray-700 rounded-2xl p-7">
+          <div class="text-gray-400 text-xs font-bold uppercase tracking-widest mb-4">Mini Índice (WIN)</div>
+          <div class="space-y-4">
+            <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+              <span class="text-gray-400">Pontos necessários/dia</span>
+              <span class="text-white font-bold text-xl">600 pts</span>
+            </div>
+            <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+              <span class="text-gray-400">Valor por ponto (1 contrato)</span>
+              <span class="text-white font-bold">R$ 0,20</span>
+            </div>
+            <div class="flex justify-between items-center border-b border-gray-800 pb-3">
+              <span class="text-gray-400">Resultado (5 contratos)</span>
+              <span class="text-yellow-400 font-bold">R$ 600</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-400">Dificuldade</span>
+              <span class="text-red-400 font-bold">🔥 Alta volatilidade</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dólar -->
+        <div class="bg-gray-950 border-2 border-yellow-500 rounded-2xl p-7 glow-gold relative">
+          <div class="absolute -top-3.5 left-1/2 -translate-x-1/2 gradient-gold text-black text-xs font-black px-4 py-1.5 rounded-full whitespace-nowrap">
+            ⚡ NOSSO BOT USA ESSE
+          </div>
+          <div class="text-yellow-400 text-xs font-bold uppercase tracking-widest mb-4">Mini Dólar (WDO)</div>
+          <div class="space-y-4">
+            <div class="flex justify-between items-center border-b border-yellow-900/30 pb-3">
+              <span class="text-gray-400">Pontos necessários/dia</span>
+              <span class="text-yellow-400 font-bold text-xl">12 pts</span>
+            </div>
+            <div class="flex justify-between items-center border-b border-yellow-900/30 pb-3">
+              <span class="text-gray-400">Valor por ponto (1 contrato)</span>
+              <span class="text-yellow-400 font-bold">R$ 10,00</span>
+            </div>
+            <div class="flex justify-between items-center border-b border-yellow-900/30 pb-3">
+              <span class="text-gray-400">Resultado (5 contratos)</span>
+              <span class="text-green-400 font-bold text-xl">R$ 600</span>
+            </div>
+            <div class="flex justify-between items-center">
+              <span class="text-gray-400">Dificuldade</span>
+              <span class="text-green-400 font-bold">✅ Bot faz tudo</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Destaque -->
+      <div class="mt-8 gradient-dark border border-yellow-500/30 rounded-2xl p-6 text-center">
+        <p class="text-2xl font-black">
+          <span class="text-yellow-400">6 pontos no Dólar</span>
+          <span class="text-gray-400 mx-3">=</span>
+          <span class="text-white">300 pontos no Índice</span>
+        </p>
+        <p class="text-gray-400 mt-2">Mesmo resultado. Muito menos trabalho. O bot entrega isso 2× por dia.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CALCULADORA -->
+  <section class="py-16 px-4 bg-gray-950">
+    <div class="max-w-3xl mx-auto text-center">
+      <h2 class="text-3xl font-black mb-3">Sua renda mensal com o bot</h2>
+      <p class="text-gray-400 mb-10">Arrasta para ver o potencial com mais contratos</p>
+
+      <div class="bg-gray-900 border border-gray-800 rounded-2xl p-8">
+        <div class="mb-6">
+          <label class="text-gray-400 text-sm mb-2 block">Número de contratos</label>
+          <input id="sliderContratos" type="range" min="1" max="20" value="5"
+                 class="w-full h-2 rounded-lg appearance-none cursor-pointer accent-yellow-400"
+                 oninput="calcular()"/>
+          <div class="flex justify-between text-xs text-gray-600 mt-1">
+            <span>1</span><span>5</span><span>10</span><span>15</span><span>20</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-4 mb-6">
+          <div class="bg-gray-800 rounded-xl p-4">
+            <div id="valDia" class="text-2xl font-black text-yellow-400">R$ 600</div>
+            <div class="text-xs text-gray-500 mt-1">por dia</div>
+          </div>
+          <div class="bg-gray-800 rounded-xl p-4">
+            <div id="valSemana" class="text-2xl font-black text-green-400">R$ 3.000</div>
+            <div class="text-xs text-gray-500 mt-1">por semana</div>
+          </div>
+          <div class="bg-gray-800 rounded-xl p-4">
+            <div id="valMes" class="text-2xl font-black text-emerald-400">R$ 12.600</div>
+            <div class="text-xs text-gray-500 mt-1">por mês (21 dias)</div>
+          </div>
+        </div>
+
+        <p class="text-xs text-gray-600">* Baseado em 12 pontos/dia, R$10/ponto por contrato. Resultado passado não garante resultado futuro.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMO FUNCIONA -->
+  <section class="py-16 px-4 bg-gray-900">
+    <div class="max-w-3xl mx-auto">
+      <h2 class="text-3xl font-black text-center mb-12">Como funciona na prática</h2>
+      <div class="space-y-4">
+        <div class="flex gap-4 items-start">
+          <div class="w-10 h-10 gradient-gold rounded-full flex items-center justify-center text-black font-black flex-shrink-0">1</div>
+          <div>
+            <div class="font-bold text-white">Bot monitora o Dólar Futuro 24h</div>
+            <div class="text-gray-400 text-sm mt-1">Algoritmo analisa Price Action, suporte/resistência e momentum em tempo real</div>
+          </div>
+        </div>
+        <div class="flex gap-4 items-start">
+          <div class="w-10 h-10 gradient-gold rounded-full flex items-center justify-center text-black font-black flex-shrink-0">2</div>
+          <div>
+            <div class="font-bold text-white">Sinal chega no seu Telegram em segundos</div>
+            <div class="text-gray-400 text-sm mt-1">Entrada exata, direção (compra/venda), alvo de 6 pontos e stop definido</div>
+          </div>
+        </div>
+        <div class="flex gap-4 items-start">
+          <div class="w-10 h-10 gradient-gold rounded-full flex items-center justify-center text-black font-black flex-shrink-0">3</div>
+          <div>
+            <div class="font-bold text-white">Você executa na sua corretora</div>
+            <div class="text-gray-400 text-sm mt-1">Rico, XP, Clear — qualquer corretora com acesso ao WDO funciona</div>
+          </div>
+        </div>
+        <div class="flex gap-4 items-start">
+          <div class="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-black flex-shrink-0">✓</div>
+          <div>
+            <div class="font-bold text-green-400">Bate o alvo e repete</div>
+            <div class="text-gray-400 text-sm mt-1">2 entradas por dia, alvo de 6 pontos cada. 12 pontos = R$ 600 com 5 contratos. Todo dia.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROVA SOCIAL -->
+  <section class="py-16 px-4 bg-gray-950">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl font-black text-center mb-12">Resultados da última semana</h2>
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-10">
+        <div class="bg-green-950/40 border border-green-800/50 rounded-xl p-4 text-center">
+          <div class="text-xs text-gray-500 mb-1">Segunda</div>
+          <div class="text-green-400 font-black text-xl">+12 pts</div>
+          <div class="text-xs text-green-600">✅ Meta batida</div>
+        </div>
+        <div class="bg-green-950/40 border border-green-800/50 rounded-xl p-4 text-center">
+          <div class="text-xs text-gray-500 mb-1">Terça</div>
+          <div class="text-green-400 font-black text-xl">+14 pts</div>
+          <div class="text-xs text-green-600">✅ Acima</div>
+        </div>
+        <div class="bg-green-950/40 border border-green-800/50 rounded-xl p-4 text-center">
+          <div class="text-xs text-gray-500 mb-1">Quarta</div>
+          <div class="text-green-400 font-black text-xl">+12 pts</div>
+          <div class="text-xs text-green-600">✅ Meta batida</div>
+        </div>
+        <div class="bg-green-950/40 border border-green-800/50 rounded-xl p-4 text-center">
+          <div class="text-xs text-gray-500 mb-1">Quinta</div>
+          <div class="text-green-400 font-black text-xl">+10 pts</div>
+          <div class="text-xs text-yellow-600">⚡ Parcial</div>
+        </div>
+        <div class="bg-green-950/40 border border-green-800/50 rounded-xl p-4 text-center">
+          <div class="text-xs text-gray-500 mb-1">Sexta</div>
+          <div class="text-green-400 font-black text-xl">+12 pts</div>
+          <div class="text-xs text-green-600">✅ Meta batida</div>
+        </div>
+      </div>
+
+      <div class="bg-yellow-500/5 border border-yellow-500/20 rounded-2xl p-6 text-center">
+        <div class="text-4xl font-black text-yellow-400 mb-1">+60 pontos</div>
+        <div class="text-gray-400">na semana = <span class="text-white font-bold">R$ 3.000 com 5 contratos</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DEPOIMENTOS -->
+  <section class="py-16 px-4 bg-gray-900">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-3xl font-black text-center mb-12">O que os membros dizem</h2>
+      <div class="grid md:grid-cols-3 gap-5">
+        <div class="bg-gray-950 border border-gray-800 rounded-2xl p-6">
+          <div class="flex gap-1 text-yellow-400 mb-3">★★★★★</div>
+          <p class="text-gray-300 text-sm mb-4">"Nunca tinha operado Dólar antes. Em 2 semanas já recuperei o investimento do plano semestral. Os sinais são simples de executar."</p>
+          <div class="text-sm font-bold text-white">Carlos R.</div>
+          <div class="text-xs text-gray-500">São Paulo, SP</div>
+        </div>
+        <div class="bg-gray-950 border border-yellow-500/30 rounded-2xl p-6 glow-gold">
+          <div class="flex gap-1 text-yellow-400 mb-3">★★★★★</div>
+          <p class="text-gray-300 text-sm mb-4">"Estava no Índice e perdendo dinheiro. Migrei pro Dólar com esse bot e em 30 dias bati R$18k de resultado. 12 pontos por dia é realista."</p>
+          <div class="text-sm font-bold text-white">Rodrigo M.</div>
+          <div class="text-xs text-gray-500">Curitiba, PR</div>
+        </div>
+        <div class="bg-gray-950 border border-gray-800 rounded-2xl p-6">
+          <div class="flex gap-1 text-yellow-400 mb-3">★★★★★</div>
+          <p class="text-gray-300 text-sm mb-4">"Uso no celular mesmo. Chega o sinal, entro na XP, bato o alvo e fecho. Em média 40 minutos de trabalho por dia. Vale muito."</p>
+          <div class="text-sm font-bold text-white">Ana Paula T.</div>
+          <div class="text-xs text-gray-500">Rio de Janeiro, RJ</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLANOS -->
+  <section id="planos" class="bg-gray-950 py-24 px-4">
+    <div class="max-w-3xl mx-auto">
+      <h2 class="text-3xl md:text-4xl font-black text-center mb-3">Escolha seu plano</h2>
+      <p class="text-gray-400 text-center mb-12">Acesso via PIX instantâneo. Sinais no Telegram em minutos.</p>
+
+      <div class="grid md:grid-cols-2 gap-6 mb-6">
+        <!-- Mensal -->
+        <div class="bg-gray-900 border border-gray-700 rounded-2xl p-7 cursor-pointer plan-card transition-all hover:border-blue-500/50"
+             onclick="selectPlan('dolar_mensal', this)">
+          <div class="text-blue-400 text-sm font-semibold mb-2 uppercase tracking-wider">Mensal</div>
+          <div class="text-5xl font-black text-white mb-1">R$200</div>
+          <div class="text-gray-500 text-sm mb-6">R$200/mês • Renova todo mês</div>
+          <ul class="space-y-2 text-sm text-gray-300">
+            <li class="flex items-center gap-2"><span class="text-blue-400">✓</span> 2 sinais de Dólar por dia</li>
+            <li class="flex items-center gap-2"><span class="text-blue-400">✓</span> Meta de 6 pts por entrada</li>
+            <li class="flex items-center gap-2"><span class="text-blue-400">✓</span> Grupo exclusivo no Telegram</li>
+            <li class="flex items-center gap-2"><span class="text-blue-400">✓</span> Suporte via chat</li>
+          </ul>
+        </div>
+
+        <!-- Semestral -->
+        <div class="bg-gray-900 border-2 border-yellow-500 rounded-2xl p-7 cursor-pointer plan-card relative transition-all glow-gold selected"
+             onclick="selectPlan('dolar_semestral', this)">
+          <div class="absolute -top-3.5 left-1/2 -translate-x-1/2 gradient-gold text-black text-xs font-black px-4 py-1.5 rounded-full whitespace-nowrap">
+            🔥 ECONOMIZE R$ 201
+          </div>
+          <div class="text-yellow-400 text-sm font-semibold mb-2 uppercase tracking-wider">Semestral</div>
+          <div class="text-5xl font-black text-white mb-1">R$999</div>
+          <div class="text-yellow-400/70 text-sm mb-1">R$166,50/mês — 6 meses de acesso</div>
+          <div class="text-green-400 text-xs mb-5 font-semibold">Economize R$201 vs plano mensal</div>
+          <ul class="space-y-2 text-sm text-gray-300">
+            <li class="flex items-center gap-2"><span class="text-yellow-400">✓</span> 2 sinais de Dólar por dia</li>
+            <li class="flex items-center gap-2"><span class="text-yellow-400">✓</span> Meta de 6 pts por entrada</li>
+            <li class="flex items-center gap-2"><span class="text-yellow-400">✓</span> Grupo exclusivo no Telegram</li>
+            <li class="flex items-center gap-2"><span class="text-yellow-400">✓</span> Suporte via chat</li>
+            <li class="flex items-center gap-2"><span class="text-yellow-400">✓</span> <strong>6 meses sem renovar</strong></li>
+            <li class="flex items-center gap-2"><span class="text-yellow-400">✓</span> <strong>Prioridade no suporte</strong></li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- FORMULÁRIO -->
+      <div class="bg-gray-900 border border-gray-700 rounded-2xl p-7" id="formSection">
+        <h3 class="text-xl font-bold mb-1">Complete seus dados</h3>
+        <p class="text-gray-400 text-sm mb-6">Plano selecionado: <span id="planLabel" class="text-yellow-400 font-semibold">Semestral — R$999</span></p>
+
+        <div class="space-y-4">
+          <div>
+            <label class="text-sm text-gray-400 mb-1.5 block">Seu nome completo</label>
+            <input id="buyerName" type="text" placeholder="João Silva"
+                   class="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-yellow-500 transition-colors" />
+          </div>
+          <div>
+            <label class="text-sm text-gray-400 mb-1.5 block">Seu @username do Telegram</label>
+            <input id="telegramUsername" type="text" placeholder="@seunome"
+                   class="w-full bg-gray-950 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-yellow-500 transition-colors" />
+            <p class="text-xs text-gray-600 mt-1.5">Abra o Telegram → Configurações → seu @username aparece abaixo do nome</p>
+          </div>
+
+          <button id="btnGerar" onclick="gerarPix()"
+                  class="w-full gradient-gold text-black font-black text-lg py-4 rounded-xl hover:scale-[1.02] transition-transform mt-2">
+            GERAR PIX AGORA →
+          </button>
+        </div>
+      </div>
+
+      <!-- PIX GERADO -->
+      <div id="pixSection" class="hidden bg-gray-900 border border-gray-700 rounded-2xl p-7 mt-4">
+        <div class="text-center mb-6">
+          <div class="text-green-400 font-bold text-lg mb-1">✅ PIX Gerado!</div>
+          <p class="text-gray-400 text-sm">Escaneie o QR Code ou copie o código PIX abaixo</p>
+        </div>
+
+        <div class="flex justify-center mb-5">
+          <img id="qrCodeImg" src="" alt="QR Code PIX"
+               class="w-52 h-52 rounded-xl border-2 border-yellow-500/30 bg-white p-2" />
+        </div>
+
+        <div class="mb-5">
+          <label class="text-sm text-gray-400 mb-1.5 block">Copia e Cola PIX</label>
+          <div class="flex gap-2">
+            <input id="pixCode" type="text" readonly
+                   class="flex-1 bg-gray-950 border border-gray-700 rounded-xl px-3 py-2.5 text-white text-sm font-mono" />
+            <button onclick="copiarPix()"
+                    class="px-4 py-2.5 bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 rounded-xl font-semibold text-sm hover:bg-yellow-500/30 transition-colors whitespace-nowrap">
+              Copiar
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-4 text-center">
+          <div class="text-yellow-400 font-semibold text-sm">⏳ Aguardando pagamento...</div>
+          <div class="text-gray-500 text-xs mt-1">Após o PIX, você receberá o link de acesso no Telegram em minutos</div>
+          <div id="timer" class="text-gray-600 text-xs mt-1">Expira em 30:00</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="py-16 px-4 bg-gray-900">
+    <div class="max-w-2xl mx-auto">
+      <h2 class="text-3xl font-black text-center mb-10">Perguntas frequentes</h2>
+      <div class="space-y-3">
+        <details class="bg-gray-950 border border-gray-800 rounded-xl p-5 cursor-pointer group">
+          <summary class="flex justify-between items-center font-semibold">
+            Preciso saber operar para usar?
+            <span class="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+          </summary>
+          <p class="text-gray-400 text-sm mt-3">Não. O bot envia a entrada exata, direção e alvo. Basta executar na sua corretora. Em 10 minutos você aprende.</p>
+        </details>
+        <details class="bg-gray-950 border border-gray-800 rounded-xl p-5 cursor-pointer group">
+          <summary class="flex justify-between items-center font-semibold">
+            Qual corretora usar?
+            <span class="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+          </summary>
+          <p class="text-gray-400 text-sm mt-3">Qualquer corretora com acesso ao WDO (Mini Dólar) na B3: Rico, XP, Clear, Modalmais, Avenue, entre outras.</p>
+        </details>
+        <details class="bg-gray-950 border border-gray-800 rounded-xl p-5 cursor-pointer group">
+          <summary class="flex justify-between items-center font-semibold">
+            Quanto preciso ter na conta?
+            <span class="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+          </summary>
+          <p class="text-gray-400 text-sm mt-3">Para operar 1 contrato de Mini Dólar você precisa de aprox. R$1.000 de margem. Para 5 contratos, R$5.000.</p>
+        </details>
+        <details class="bg-gray-950 border border-gray-800 rounded-xl p-5 cursor-pointer group">
+          <summary class="flex justify-between items-center font-semibold">
+            Os 12 pontos são garantidos?
+            <span class="text-gray-400 group-open:rotate-180 transition-transform">▼</span>
+          </summary>
+          <p class="text-gray-400 text-sm mt-3">O bot busca 12 pontos por dia como meta. Os resultados históricos mostram consistência, mas mercado financeiro tem riscos. Nunca opere com dinheiro que não pode perder.</p>
+        </details>
+        <details class="bg-gray-950 border border-gray-800 rounded-xl p-5 cursor-pointer group">
+          <summary class="flex justify-between items-center font-semibold">
+            Como recebo o acesso após pagar?
+            <span class="text-gray-400 group-open:rotate-180 transition-term">▼</span>
+          </summary>
+          <p class="text-gray-400 text-sm mt-3">Após o PIX ser confirmado, você recebe um link exclusivo no Telegram em até 5 minutos para entrar no grupo de sinais.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA FINAL -->
+  <section class="py-20 px-4 gradient-dark text-center">
+    <div class="max-w-2xl mx-auto">
+      <h2 class="text-3xl md:text-4xl font-black mb-4">
+        Enquanto você lê isso,<br/>
+        <span class="text-yellow-400">o Dólar está se movendo</span>
+      </h2>
+      <p class="text-gray-400 text-lg mb-10">Cada ponto perdido sem o bot é dinheiro que ficou na mesa. Não perca mais.</p>
+      <a href="#planos" class="inline-block gradient-gold text-black font-black text-xl px-14 py-5 rounded-2xl glow-gold hover:scale-105 transition-transform">
+        GARANTIR MEU ACESSO AGORA →
+      </a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="bg-gray-900 border-t border-gray-800 py-8 px-4 text-center text-gray-600 text-sm">
+    <p>Dólar Signal Bot • Sinais para Mini Dólar Futuro (WDO/B3)</p>
+    <p class="mt-2 text-xs">Operações em mercado futuro envolvem risco. Resultados passados não garantem resultados futuros.</p>
+  </footer>
+
+  <script>
+    const API_URL = "https://wdo-vip-backend.onrender.com";
+
+    let selectedPlan = "dolar_semestral";
+    let paymentId = null;
+    let timerInterval = null;
+
+    const planLabels = {
+      "dolar_mensal":    "Mensal — R$200",
+      "dolar_semestral": "Semestral — R$999",
+    };
+
+    function selectPlan(plan, el) {
+      selectedPlan = plan;
+      document.querySelectorAll(".plan-card").forEach(c => {
+        c.classList.remove("border-yellow-500", "border-blue-500", "border-2", "glow-gold", "glow-blue", "selected");
+        c.classList.add("border-gray-700");
+      });
+      el.classList.remove("border-gray-700");
+      if (plan === "dolar_semestral") {
+        el.classList.add("border-2", "border-yellow-500", "glow-gold", "selected");
+      } else {
+        el.classList.add("border-2", "border-blue-500", "glow-blue", "selected");
+      }
+      document.getElementById("planLabel").textContent = planLabels[plan];
+    }
+
+    async function gerarPix() {
+      const name = document.getElementById("buyerName").value.trim();
+      const username = document.getElementById("telegramUsername").value.trim().replace("@", "");
+      if (!name || !username) {
+        alert("Preencha seu nome e @username do Telegram.");
+        return;
+      }
+
+      const btn = document.getElementById("btnGerar");
+      btn.textContent = "Gerando PIX...";
+      btn.disabled = true;
+
+      try {
+        const res = await fetch(`${API_URL}/payments/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan: selectedPlan, buyer_name: name, telegram_username: username }),
+        });
+        if (!res.ok) throw new Error("Erro na API");
+        const data = await res.json();
+
+        paymentId = data.payment_id;
+        document.getElementById("formSection").classList.add("hidden");
+        document.getElementById("pixSection").classList.remove("hidden");
+
+        if (data.qr_code_base64) {
+          document.getElementById("qrCodeImg").src = "data:image/png;base64," + data.qr_code_base64;
+        }
+        document.getElementById("pixCode").value = data.pix_copy_paste || data.qr_code;
+
+        startTimer(30 * 60);
+        pollStatus();
+      } catch (e) {
+        alert("Erro ao gerar o PIX. Tente novamente.");
+        btn.textContent = "GERAR PIX AGORA →";
+        btn.disabled = false;
+      }
+    }
+
+    function copiarPix() {
+      const code = document.getElementById("pixCode").value;
+      navigator.clipboard.writeText(code).then(() => alert("Código PIX copiado!"));
+    }
+
+    function startTimer(seconds) {
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        seconds--;
+        const m = String(Math.floor(seconds / 60)).padStart(2, "0");
+        const s = String(seconds % 60).padStart(2, "0");
+        document.getElementById("timer").textContent = `Expira em ${m}:${s}`;
+        if (seconds <= 0) clearInterval(timerInterval);
+      }, 1000);
+    }
+
+    async function pollStatus() {
+      if (!paymentId) return;
+      try {
+        const res = await fetch(`${API_URL}/payments/status/${paymentId}`);
+        const data = await res.json();
+        if (data.status === "paid" || data.request_status === "approved") {
+          clearInterval(timerInterval);
+          const inviteBtn = data.invite_link
+            ? `<a href="${data.invite_link}" target="_blank"
+                  class="inline-block mt-6 gradient-gold text-black font-black text-lg px-10 py-4 rounded-xl hover:scale-105 transition-transform">
+                 👉 ENTRAR NO CANAL VIP AGORA
+               </a>
+               <p class="text-gray-500 text-xs mt-3">Link exclusivo — use uma única vez. Válido por 48h.</p>`
+            : `<p class="text-gray-400 mt-4">Seu link de acesso chegará em instantes.</p>`;
+          document.getElementById("pixSection").innerHTML = `
+            <div class="text-center py-8">
+              <div class="text-5xl mb-4">✅</div>
+              <div class="text-green-400 font-black text-2xl mb-2">Pagamento Confirmado!</div>
+              <p class="text-gray-400">Bem-vindo ao <b>Sala VIP Dólar</b>. Clique abaixo para entrar:</p>
+              ${inviteBtn}
+            </div>`;
+          return;
+        }
+      } catch {}
+      setTimeout(pollStatus, 5000);
+    }
+
+    function calcular() {
+      const contratos = parseInt(document.getElementById("sliderContratos").value);
+      const dia = contratos * 12 * 10;
+      const semana = dia * 5;
+      const mes = dia * 21;
+      const fmt = v => "R$ " + v.toLocaleString("pt-BR");
+      document.getElementById("valDia").textContent = fmt(dia);
+      document.getElementById("valSemana").textContent = fmt(semana);
+      document.getElementById("valMes").textContent = fmt(mes);
+    }
+  </script>
+
+  <!-- Gráfico de velas animado no hero -->
+  <script>
+  (function() {
+    const canvas = document.getElementById('candleCanvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const CANDLE_W = 18, GAP = 10, STEP = CANDLE_W + GAP;
+    const NUM = 60;
+
+    // Gera velas sintéticas com passeio aleatório
+    function genCandles(n, startPrice) {
+      const c = [];
+      let price = startPrice;
+      for (let i = 0; i < n; i++) {
+        const open = price;
+        const move = (Math.random() - 0.48) * 12;
+        const close = open + move;
+        const high = Math.max(open, close) + Math.random() * 6;
+        const low  = Math.min(open, close) - Math.random() * 6;
+        c.push({ open, close, high, low });
+        price = close;
+      }
+      return c;
+    }
+
+    let candles = genCandles(NUM, 5800);
+    let offset = 0; // offset de scroll horizontal
+    let animFrame;
+
+    function resize() {
+      canvas.width  = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    }
+
+    function draw() {
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+
+      // grade de fundo
+      ctx.strokeStyle = 'rgba(59,130,246,0.12)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < W; x += 60) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+      }
+      for (let y = 0; y < H; y += 50) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      }
+
+      // Calcula escala
+      const visible = candles.slice(Math.max(0, Math.floor(offset / STEP)), Math.floor(offset / STEP) + Math.ceil(W / STEP) + 2);
+      if (!visible.length) return;
+      const allHigh = Math.max(...visible.map(c => c.high));
+      const allLow  = Math.min(...visible.map(c => c.low));
+      const range = allHigh - allLow || 1;
+      const pad = 30;
+      const scaleY = v => pad + ((allHigh - v) / range) * (H - pad * 2);
+
+      // Desenha velas
+      let x = -(offset % STEP);
+      const startIdx = Math.floor(offset / STEP);
+      for (let i = 0; i < Math.ceil(W / STEP) + 2; i++) {
+        const ci = startIdx + i;
+        if (ci < 0 || ci >= candles.length) { x += STEP; continue; }
+        const c = candles[ci];
+        const isGreen = c.close >= c.open;
+        const color   = isGreen ? '#22c55e' : '#ef4444';
+        const bodyTop = scaleY(Math.max(c.open, c.close));
+        const bodyBot = scaleY(Math.min(c.open, c.close));
+        const bodyH   = Math.max(bodyBot - bodyTop, 2);
+
+        // pavio
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x + CANDLE_W / 2, scaleY(c.high));
+        ctx.lineTo(x + CANDLE_W / 2, scaleY(c.low));
+        ctx.stroke();
+
+        // corpo
+        ctx.fillStyle = color;
+        ctx.fillRect(x, bodyTop, CANDLE_W, bodyH);
+
+        x += STEP;
+      }
+
+      // Linha de preço atual (última vela visível)
+      const last = candles[Math.min(startIdx + Math.ceil(W / STEP), candles.length - 1)];
+      if (last) {
+        const py = scaleY(last.close);
+        ctx.strokeStyle = 'rgba(251,191,36,0.7)';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(W, py); ctx.stroke();
+        ctx.setLineDash([]);
+
+        // label do preço
+        ctx.fillStyle = '#f59e0b';
+        ctx.font = 'bold 12px Inter, sans-serif';
+        ctx.fillText(last.close.toFixed(0), W - 55, py - 4);
+      }
+    }
+
+    function tick() {
+      offset += 0.4;
+      // Quando scroll passa o fim, gera nova vela e empurra
+      if (offset >= candles.length * STEP - canvas.width * 1.5) {
+        const last = candles[candles.length - 1];
+        const move = (Math.random() - 0.48) * 12;
+        const open  = last.close;
+        const close = open + move;
+        candles.push({
+          open, close,
+          high: Math.max(open, close) + Math.random() * 6,
+          low:  Math.min(open, close) - Math.random() * 6,
+        });
+        // remove velas antigas demais
+        if (candles.length > NUM * 3) {
+          candles.shift();
+          offset -= STEP;
+        }
+      }
+      draw();
+      animFrame = requestAnimationFrame(tick);
+    }
+
+    window.addEventListener('resize', () => { resize(); });
+    resize();
+    tick();
+  })();
+  </script>
+</body>
+</html>
