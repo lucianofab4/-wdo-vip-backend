@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: wdo-vip-backend
+    runtime: python
+    buildCommand: pip install -r requirements-api.txt
+    startCommand: uvicorn api.main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        value: 8992965841:AAGOg60JQ5ysTi9nyNcnm-B8COFuuhlJScM
+      - key: TELEGRAM_ADMIN_IDS
+        value: "1191003457"
+      - key: TELEGRAM_BOT_USERNAME
+        value: Wdotrader_bot
+      - key: VIP_BOT_TOKEN
+        value: 8992965841:AAGOg60JQ5ysTi9nyNcnm-B8COFuuhlJScM
+      - key: VIP_CHANNEL_ID
+        value: "-1004459210142"
+      - key: MP_ACCESS_TOKEN
+        value: APP_USR-5583372059840025-052821-7e16d5180e22b24c0799002489121e4c-166806987
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: wdo-vip-db
+          property: connectionString
+
+databases:
+  - name: wdo-vip-db
+    plan: free

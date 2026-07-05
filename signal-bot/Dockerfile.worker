@@ -1,0 +1,23 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Instala dependências do sistema para o Playwright/Chromium
+RUN apt-get update && apt-get install -y \
+    wget \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Instala dependências Python
+COPY requirements-worker.txt .
+RUN pip install --no-cache-dir -r requirements-worker.txt
+
+# Instala o Chromium e todas as suas dependências do sistema
+RUN playwright install-deps chromium
+RUN playwright install chromium
+
+# Copia o código
+COPY . .
+
+# Inicia bot + coletor
+CMD ["bash", "start_worker.sh"]
