@@ -29,4 +29,8 @@ async def health():
 
 @app.on_event("startup")
 async def startup():
+    from database.connection import engine
+    from database.models import Base
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     logger.info("API iniciada.")
