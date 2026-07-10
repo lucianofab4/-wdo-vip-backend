@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-from api.routes import results, signals, stats, strategies, users, payments
+from api.routes import results, signals, stats, strategies, users, payments, wdo
 
 app = FastAPI(title="Signal Bot API", version="1.0.0", docs_url="/docs")
 
@@ -20,6 +20,7 @@ app.include_router(stats.router)
 app.include_router(strategies.router)
 app.include_router(users.router)
 app.include_router(payments.router)
+app.include_router(wdo.router)
 
 
 @app.get("/health")

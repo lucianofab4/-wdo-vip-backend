@@ -90,3 +90,46 @@ export const toggleStrategy = (game: string, strategy: string, is_active: boolea
   api.patch<StrategyConfig>(`/strategies/${game}/${strategy}`, { is_active }).then((r) => r.data);
 export const toggleGame = (game: string, enabled: boolean) =>
   api.post("/strategies/game-toggle", { game, enabled }).then((r) => r.data);
+
+// ─── WDO ─────────────────────────────────────────────────────────────────────
+
+export interface WdoSignal {
+  id: number;
+  direction: string;          // COMPRA | VENDA
+  entry_price: number | null;
+  signal_type: string;        // REGIAO_SUPORTE | MM6_PULLBACK | OPEN_DRIVE | etc.
+  status: string;             // pending | win | loss | cancelled
+  pts_result: number | null;  // +6.0 = win, -3.0 = loss
+  signal_time: string | null; // HH:MM
+  created_at: string;
+  resolved_at: string | null;
+}
+
+export interface WdoStats {
+  total: number;
+  wins: number;
+  losses: number;
+  pending: number;
+  cancelled: number;
+  win_rate: number;
+}
+
+export interface FreeSubscriber {
+  id: number;
+  telegram_id: number;
+  username: string | null;
+  first_name: string | null;
+  joined_at: string | null;
+  synced_at: string | null;
+}
+
+export const fetchWdoSignals = (params?: {
+  date?: string; hour?: string; direction?: string; status?: string; limit?: number;
+}) => api.get<WdoSignal[]>("/wdo/signals", { params }).then((r) => r.data);
+
+export const fetchWdoStats = (params?: {
+  date?: string; hour_from?: string; hour_to?: string;
+}) => api.get<WdoStats>("/wdo/stats", { params }).then((r) => r.data);
+
+export const fetchFreeSubscribers = () =>
+  api.get<FreeSubscriber[]>("/wdo/free-subscribers").then((r) => r.data);

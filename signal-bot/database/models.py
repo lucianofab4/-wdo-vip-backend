@@ -105,3 +105,28 @@ class DailyMetric(Base):
     win_rate = Column(Numeric(5, 2), nullable=True)
 
     __table_args__ = (UniqueConstraint("game", "date"),)
+
+
+class WdoSignal(Base):
+    __tablename__ = "wdo_signals"
+
+    id          = Column(BigInteger, primary_key=True, autoincrement=True)
+    direction   = Column(String(10), nullable=False)        # COMPRA | VENDA
+    entry_price = Column(Numeric(10, 1), nullable=True)
+    signal_type = Column(String(50), nullable=False)        # REGIAO_SUPORTE | REGIAO_RESISTENCIA | MM6_PULLBACK | OPEN_DRIVE | GAP_FADE | TOPO_DIA | FUNDO_DIA
+    status      = Column(String(20), nullable=False, default="pending")  # pending | win | loss | cancelled
+    pts_result  = Column(Numeric(6, 1), nullable=True)      # +6.0 = win, -3.0 = loss
+    signal_time = Column(String(5), nullable=True)          # HH:MM para filtro por hora
+    created_at  = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class FreeSubscriber(Base):
+    __tablename__ = "free_subscribers"
+
+    id          = Column(BigInteger, primary_key=True, autoincrement=True)
+    telegram_id = Column(BigInteger, unique=True, nullable=False)
+    username    = Column(String(100), nullable=True)
+    first_name  = Column(String(100), nullable=True)
+    joined_at   = Column(DateTime(timezone=True), nullable=True)
+    synced_at   = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -1,6 +1,6 @@
 [[redirects]]
   from = "/api/*"
-  to = "https://radiant-comfort-production-cd12.up.railway.app/:splat"
+  to = "https://wdo-vip-backend.onrender.com/:splat"
   status = 200
   force = true
 
