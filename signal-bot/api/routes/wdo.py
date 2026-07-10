@@ -3,7 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlalchemy import desc, func, select
+from sqlalchemy import Date, cast, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import get_db
@@ -116,8 +116,7 @@ async def list_wdo_signals(
     if status:
         q = q.where(WdoSignal.status == status)
     if date:
-        from sqlalchemy import cast, Date
-        q = q.where(func.date(WdoSignal.created_at) == date)
+        q = q.where(cast(WdoSignal.created_at, Date) == date)
     if hour:
         q = q.where(WdoSignal.signal_time.startswith(hour + ":"))
     result = await db.execute(q)
@@ -134,7 +133,7 @@ async def wdo_stats(
     if not date:
         date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-    q = select(WdoSignal).where(func.date(WdoSignal.created_at) == date)
+    q = select(WdoSignal).where(cast(WdoSignal.created_at, Date) == date)
     if hour_from:
         q = q.where(WdoSignal.signal_time >= hour_from + ":00")
     if hour_to:
